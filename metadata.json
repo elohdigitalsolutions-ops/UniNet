@@ -1,0 +1,6 @@
+{
+  "name": "UniNet",
+  "description": "Initial structural skeleton for the UniNet platform, featuring a Node.js Express server, in-memory Device Registry, and real-time WebSocket dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
