@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node app.js",
-    "build": "echo 'No custom build required for self-contained app.js'",
+    "build": "vite build",
     "start": "node app.js",
     "preview": "node app.js",
     "clean": "rm -rf dist",
