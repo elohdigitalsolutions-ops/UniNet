@@ -9,12 +9,28 @@ import { ClientConnection } from './components/ClientConnection';
 import { RelaySandbox } from './components/RelaySandbox';
 import { SystemLogsConsole } from './components/SystemLogsConsole';
 import { SystemFooter } from './components/SystemFooter';
+import { WebTunnelBrowser } from './components/WebTunnelBrowser';
 
 export default function App() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('OFFLINE');
-  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('mesh_device_uuid');
+      if (saved) return saved;
+      // Generate a new unique identifier (DEV-XXXX-XXXX)
+      const segments = [
+        Math.random().toString(36).substring(2, 6).toUpperCase(),
+        Math.random().toString(36).substring(2, 6).toUpperCase()
+      ];
+      const newId = `DEV-${segments.join('-')}`;
+      localStorage.setItem('mesh_device_uuid', newId);
+      return newId;
+    }
+    return null;
+  });
   const [nodeCount, setNodeCount] = useState<number>(1);
   const [activePeerId, setActivePeerId] = useState<string | null>(null);
+  const [role, setRole] = useState<'host' | 'client' | null>(null);
 
   // UI state representation
   const [roleStatusText, setRoleStatusText] = useState<string>('Idle / Standard Client');
@@ -28,6 +44,7 @@ export default function App() {
   const [copiedId, setCopiedId] = useState<boolean>(false);
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
   const [initialTargetId, setInitialTargetId] = useState<string>('');
+  const [reconnectTrigger, setReconnectTrigger] = useState<number>(0);
 
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -84,7 +101,7 @@ export default function App() {
       wsHost = 'ais-pre-ni3o2vaxtkxxcy5sguyytz-17612676419.europe-west2.run.app';
     }
 
-    const wsUrl = `${protocol}//${wsHost}`;
+    const wsUrl = `${protocol}//${wsHost}/ws${deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : ''}`;
     addLog(`Establishing connection with gateway ${wsUrl} ...`, 'system');
 
     const socket = new WebSocket(wsUrl);
@@ -97,7 +114,6 @@ export default function App() {
 
     socket.onclose = () => {
       setConnectionStatus('OFFLINE');
-      setDeviceId(null);
       addLog('Gateway socket disconnected.', 'error');
       
       // Reset state representation
@@ -105,13 +121,13 @@ export default function App() {
       setRoleSubtext('Waiting for custom protocol command');
       setRoleDotClass('bg-slate-600');
       setActivePeerId(null);
+      setRole(null);
       setChatMessages([]);
 
       // Attempt reconnection
       addLog('Scheduling reconnection in 5 seconds...', 'warn');
       setTimeout(() => {
-        // Simple trick to trigger useEffect reload
-        setConnectionStatus((prev) => (prev === 'OFFLINE' ? 'OFFLINE' : 'OFFLINE'));
+        setReconnectTrigger((prev) => prev + 1);
       }, 5000);
     };
 
@@ -144,6 +160,7 @@ export default function App() {
           case 'connection_established': {
             const peer = packet.data.peerId;
             setActivePeerId(peer);
+            setRole(packet.data.role);
             setRoleStatusText(`Connected with ${peer}`);
             setRoleSubtext(`Tunnel cross-linked successfully with device ${peer}.`);
             setRoleDotClass('bg-indigo-500');
@@ -155,6 +172,7 @@ export default function App() {
             addLog('Linked partner has disconnected from the gateway network.', 'error');
             appendChatMessage('SYSTEM', 'Tunnel link broken: partner disconnected.', false, 'bg-rose-950/15 text-rose-400 font-bold');
             setActivePeerId(null);
+            setRole(null);
             setRoleStatusText('Idle / Standard Client');
             setRoleSubtext('Waiting for custom protocol command');
             setRoleDotClass('bg-slate-600');
@@ -182,7 +200,7 @@ export default function App() {
     return () => {
       socket.close();
     };
-  }, []);
+  }, [reconnectTrigger, deviceId]);
 
   // Handle URL Pairing Router trigger
   useEffect(() => {
@@ -298,6 +316,7 @@ export default function App() {
     setRoleSubtext('Waiting for custom protocol command');
     setRoleDotClass('bg-slate-600');
     setActivePeerId(null);
+    setRole(null);
     setChatMessages([]);
   };
 
@@ -324,6 +343,15 @@ export default function App() {
           onCopyId={handleCopyId}
           copied={copiedId}
         />
+
+        {activePeerId && (
+          <WebTunnelBrowser
+            role={role}
+            partnerId={activePeerId}
+            deviceId={deviceId}
+            socket={socketRef.current}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Controllers and QR Display (Left Side, 7 Columns) */}

@@ -19,13 +19,48 @@ async function startServer() {
   // Create HTTP server instance
   const server = createServer(app);
 
-  // Attach WebSocket server on top of the same HTTP server instance
-  const wss = new WebSocketServer({ server });
+  // Create WebSocket server with no standalone port or auto-attach to server
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Intercept and handle upgrade requests specifically for /ws
+  server.on('upgrade', (request, socket, head) => {
+    const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+    if (url.pathname === '/ws') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
 
   // WebSocket Connection Handlers
-  wss.on('connection', (ws) => {
-    // Generate a random unique device ID
-    const clientId = 'DEV-' + Math.floor(1000 + Math.random() * 9000);
+  wss.on('connection', (ws, req) => {
+    // Parse client-driven persistent device ID from query parameters
+    let clientId;
+    try {
+      const url = new URL(req.url || '', `http://${req.headers?.host || 'localhost'}`);
+      const queryId = url.searchParams.get('deviceId');
+      if (queryId && queryId.trim().length > 0) {
+        clientId = queryId.trim();
+      }
+    } catch (e) {
+      console.error('[UniNet] Error parsing deviceId from query parameters:', e);
+    }
+
+    if (!clientId) {
+      clientId = 'DEV-' + Math.floor(1000 + Math.random() * 9000);
+    }
+
+    // Terminate existing connection with the same client ID if any
+    if (deviceRegistry.has(clientId)) {
+      const existingState = deviceRegistry.get(clientId);
+      if (existingState) {
+        console.log(`[UniNet] Terminating old stale socket for clientId: ${clientId}`);
+        try {
+          existingState.ws.close();
+        } catch (err) {}
+        deviceRegistry.delete(clientId);
+      }
+    }
     
     // Create state registry entry
     const clientState = {
@@ -178,6 +213,64 @@ async function startServer() {
               type: 'error',
               data: { text: 'Relay failed: No active peer connected.' }
             }));
+          }
+          break;
+        }
+
+        case 'tunnel_fetch_request': {
+          if (clientState.partnerId) {
+            const partner = deviceRegistry.get(clientState.partnerId);
+            if (partner && partner.ws.readyState === WebSocket.OPEN) {
+              partner.ws.send(JSON.stringify({
+                type: 'tunnel_fetch_request',
+                data: {
+                  senderId: clientId,
+                  url: packet.data.url,
+                  requestId: packet.data.requestId
+                }
+              }));
+            }
+          }
+          break;
+        }
+
+        case 'tunnel_fetch_response': {
+          if (clientState.partnerId) {
+            const partner = deviceRegistry.get(clientState.partnerId);
+            if (partner && partner.ws.readyState === WebSocket.OPEN) {
+              partner.ws.send(JSON.stringify({
+                type: 'tunnel_fetch_response',
+                data: {
+                  senderId: clientId,
+                  url: packet.data.url,
+                  requestId: packet.data.requestId,
+                  html: packet.data.html,
+                  status: packet.data.status,
+                  bytes: packet.data.bytes,
+                  contentType: packet.data.contentType,
+                  loadTimeMs: packet.data.loadTimeMs,
+                  hostIp: packet.data.hostIp,
+                  title: packet.data.title
+                }
+              }));
+            }
+          }
+          break;
+        }
+
+        case 'tunnel_speed_update': {
+          if (clientState.partnerId) {
+            const partner = deviceRegistry.get(clientState.partnerId);
+            if (partner && partner.ws.readyState === WebSocket.OPEN) {
+              partner.ws.send(JSON.stringify({
+                type: 'tunnel_speed_update',
+                data: {
+                  senderId: clientId,
+                  speedKbps: packet.data.speedKbps,
+                  pingMs: packet.data.pingMs
+                }
+              }));
+            }
           }
           break;
         }

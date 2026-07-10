@@ -26,3 +26,29 @@ export interface StatusUpdateData {
   message: string;
   style?: 'system' | 'success' | 'error' | 'incoming' | 'outgoing' | 'warn';
 }
+
+export interface TunnelRequest {
+  senderId: string;
+  url: string;
+  requestId: string;
+}
+
+export interface TunnelResponse {
+  senderId: string;
+  url: string;
+  requestId: string;
+  html: string;
+  status: number;
+  bytes: number;
+  contentType: string;
+  loadTimeMs: number;
+  hostIp?: string;
+  title?: string;
+}
+
+export interface TunnelSpeedData {
+  senderId: string;
+  speedKbps: number;
+  pingMs: number;
+}
+
