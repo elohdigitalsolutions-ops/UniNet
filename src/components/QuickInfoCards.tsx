@@ -25,7 +25,7 @@ export const QuickInfoCards: React.FC<QuickInfoCardsProps> = ({
       {/* Card 1: Local ID display */}
       <div className="bg-[#151517] border border-[#222] p-5 rounded-lg flex flex-col justify-between shadow-sm">
         <div>
-          <h2 class="text-[10px] uppercase text-[#666] font-bold tracking-widest">Local Device Identity</h2>
+          <h2 className="text-[10px] uppercase text-[#666] font-bold tracking-widest">Local Device Identity</h2>
           <div className="bg-black/40 border border-[#333] rounded p-3 mt-3 flex items-center justify-between">
             <code className="text-indigo-400 font-mono-custom text-sm break-all">
               {deviceId || 'Generating...'}
@@ -70,7 +70,7 @@ export const QuickInfoCards: React.FC<QuickInfoCardsProps> = ({
       {/* Card 3: Mesh Global registry node count */}
       <div className="bg-[#151517] border border-[#222] p-5 rounded-lg flex flex-col justify-between shadow-sm">
         <div>
-          <h2 class="text-[10px] uppercase text-[#666] font-bold tracking-widest">Mesh Global Registry</h2>
+          <h2 className="text-[10px] uppercase text-[#666] font-bold tracking-widest">Mesh Global Registry</h2>
           <div className="mt-3">
             <span className="text-white text-2xl font-black font-mono-custom tracking-tight">
               {nodeCount} {nodeCount === 1 ? 'Node' : 'Nodes'}
